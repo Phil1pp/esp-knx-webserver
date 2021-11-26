@@ -12,8 +12,12 @@
     #error "Wrong hardware. Not ESP8266 or ESP32"
 #endif
 
-typedef void callbackSetProgmode(bool);
-typedef bool callbackGetProgmode();
+#define KNX_MODE_OFF 0
+#define KNX_MODE_NORMAL 1
+#define KNX_MODE_PROG 2
+
+typedef void callbackSetKnxMode(int mode);
+typedef int callbackGetKnxMode();
 
 class KnxWebserver
 {
@@ -25,8 +29,8 @@ public:
     void setKnxDetail(String physAddr, bool configOk);
     void loop();
 
-    void registerSetProgmodeCallback(callbackSetProgmode* fctn);
-    void registerGetProgmodeCallback(callbackGetProgmode* fctn);
+    void registerSetKnxModeCallback(callbackSetKnxMode* fctn);
+    void registerGetKnxModeCallback(callbackGetKnxMode* fctn);
 
 private:
     #if defined(ESP32)
@@ -45,14 +49,15 @@ private:
     unsigned long otaStartTime = 0;
 
     void handleRoot();
-    void handleProgmodeOn();
-    void handleProgmodeOff();
-    void handleNotFound();
+    void handleProgMode();
+    void handleNormalMode();
+    void handleKnxOff();
     void handleOtaOn();
     void handleOtaOff();
+    void handleNotFound();
     void otaSetup();
     int getRSSIasQuality(int RSSI);
 
-    callbackSetProgmode* setProgmodeFctn;
-    callbackGetProgmode* getProgmodeFctn;
+    callbackSetKnxMode* setKnxModeFctn;
+    callbackGetKnxMode* getKnxModeFctn;
 };

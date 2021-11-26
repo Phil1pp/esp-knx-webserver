@@ -13,10 +13,12 @@ void KnxWebserver::startWeb(const char* www_username, const char* www_password)
 
     server->on("/", [this]()
                { if (authRequired && !server->authenticate(username, password)) { return server->requestAuthentication(); } handleRoot(); });
-    server->on("/progmodeon", [this]()
-               { if (authRequired && !server->authenticate(username, password)) { return server->requestAuthentication(); } handleProgmodeOn(); });
-    server->on("/progmodeoff", [this]()
-               { if (authRequired && !server->authenticate(username, password)) { return server->requestAuthentication(); } handleProgmodeOff(); });
+    server->on("/progmode", [this]()
+               { if (authRequired && !server->authenticate(username, password)) { return server->requestAuthentication(); } handleProgMode(); });
+    server->on("/normalmode", [this]()
+               { if (authRequired && !server->authenticate(username, password)) { return server->requestAuthentication(); } handleNormalMode(); });
+    server->on("/knxoff", [this]()
+               { if (authRequired && !server->authenticate(username, password)) { return server->requestAuthentication(); } handleKnxOff(); });
     server->on("/otaon", [this]()
                { if (authRequired && !server->authenticate(username, password)) { return server->requestAuthentication(); } handleOtaOn(); });
     server->on("/otaoff", [this]()
@@ -54,14 +56,14 @@ void KnxWebserver::setKnxDetail(String physAddr, bool configOk)
     knxConfigOk = configOk;
 }
 
-void KnxWebserver::registerSetProgmodeCallback(callbackSetProgmode *fctn)
+void KnxWebserver::registerSetKnxModeCallback(callbackSetKnxMode *fctn)
 {
-    setProgmodeFctn = fctn;
+    setKnxModeFctn = fctn;
 }
 
-void KnxWebserver::registerGetProgmodeCallback(callbackGetProgmode *fctn)
+void KnxWebserver::registerGetKnxModeCallback(callbackGetKnxMode *fctn)
 {
-    getProgmodeFctn = fctn;
+    getKnxModeFctn = fctn;
 }
 
 void KnxWebserver::handleRoot()
@@ -72,9 +74,9 @@ void KnxWebserver::handleRoot()
     msg += "<style>html {font-family: Helvetica; display: inline-block; color: #444444; text-align: center;}\n";
     msg += "h1 {margin: 50px auto 30px;}\n";
     msg += ".button {display: inline-block;width: 80px;background-color: #3498db;border: none;color: white;padding: 13px 30px;text-decoration: none;font-size: 25px;margin: 0px 5px 35px 5px;cursor: pointer;border-radius: 4px;}\n";
-    msg += ".button-on {background-color: #3498db; cursor: not-allowed ;}\n";
-    msg += ".button-off {background-color: #34495e;}\n";
-    msg += ".button-off:active {background-color: #2c3e50;}\n";
+    msg += ".button-blue {background-color: #3498db; cursor: not-allowed ;}\n";
+    msg += ".button-dark {background-color: #34495e;}\n";
+    msg += ".button-dark:active {background-color: #2c3e50;}\n";
     msg += ".warning {color: #a93226;}\n";
     msg += "p {font-size: 14px;color: #888;margin-bottom: 10px;}\n";
     msg += "</style>\n";
@@ -88,15 +90,20 @@ void KnxWebserver::handleRoot()
         msg += "<h3 class=\"warning\">KNX configuration incomplete!</h3>\n";
     }
 
-    if (getProgmodeFctn != nullptr)
+    if (getKnxModeFctn != nullptr)
     {
-        if (getProgmodeFctn())
-        {           
-            msg += "<p>KNX Progmode:</p><a class=\"button button-on\">ON</a><a class=\"button button-off\" href=\"/progmodeoff\">OFF</a>\n";
-        }
-        else
+        msg += "<p>KNX Mode:</p>";
+        switch (getKnxModeFctn())
         {
-            msg += "<p>KNX Progmode:</p><a class=\"button button-off\" href=\"/progmodeon\">ON</a><a class=\"button button-on\">OFF</a>\n";
+        case KNX_MODE_OFF:
+            msg += "<a class=\"button button-dark\" href=\"/progmode\">PROG</a><a class=\"button button-dark\" href=\"/normalmode\">Normal</a><a class=\"button button-blue\">OFF</a>\n";
+            break;
+        case KNX_MODE_NORMAL:
+            msg += "<a class=\"button button-dark\" href=\"/progmode\">PROG</a><a class=\"button button-blue\">Normal</a><a class=\"button button-dark\" href=\"/knxoff\">OFF</a>\n";
+            break;
+        case KNX_MODE_PROG:
+            msg += "<a class=\"button button-blue\">PROG</a><a class=\"button button-dark\" href=\"/normalmode\">Normal</a><a class=\"button button-dark\" href=\"/knxoff\">OFF</a>\n";
+            break;
         }
     }
 
@@ -104,17 +111,17 @@ void KnxWebserver::handleRoot()
     {
         int remainingTime = 5 * 60 - (millis()-otaStartTime)/1000;
         msg += "<script>var t=" + String(remainingTime) +";var x=setInterval(function(){var m=Math.floor(t/60);var s=t%60;document.getElementById(\"timer\").innerHTML=m+\"m \"+s+\"s\";t--;if(t<0){clearInterval(x);location.reload();}},1000);</script>";
-        msg += "<p>OTA: <span id=\"timer\"></span></p><a class=\"button button-on\">ON</a><a class=\"button button-off\" href=\"/otaoff\">OFF</a>\n";
+        msg += "<p>OTA: <span id=\"timer\"></span></p><a class=\"button button-blue\">ON</a><a class=\"button button-dark\" href=\"/otaoff\">OFF</a>\n";
     }
     else
     {
-        msg += "<p>OTA:</p><a class=\"button button-off\" href=\"/otaon\">ON</a><a class=\"button button-on\">OFF</a>\n";
+        msg += "<p>OTA:</p><a class=\"button button-dark\" href=\"/otaon\">ON</a><a class=\"button button-blue\">OFF</a>\n";
     }
 
-    msg += "<p>System:</p><a class=\"button button\" href=\"/restart\">Restart</a>";
+    msg += "<p>System:</p><a class=\"button button-dark\" href=\"/restart\">Restart</a>";
     if (authRequired)
     {
-        msg += "<a class=\"button button\" onclick=\"window.open('http://logout@'+window.location.host,'_self');\">Logout</a>";
+        msg += "<a class=\"button button-dark\" onclick=\"window.open('http://logout@'+window.location.host,'_self');\">Logout</a>";
     }
     msg += "\n";
     
@@ -157,21 +164,31 @@ void KnxWebserver::handleRoot()
     server->send(200, "text/html", msg);
 }
 
-void KnxWebserver::handleProgmodeOn()
+void KnxWebserver::handleProgMode()
 {
-    if (setProgmodeFctn != nullptr)
+    if (setKnxModeFctn != nullptr)
     {
-        setProgmodeFctn(true);
+        setKnxModeFctn(KNX_MODE_PROG);
     }
     server->sendHeader("Location", String("/"), true);
     server->send(302, "text/plain", "");
 }
 
-void KnxWebserver::handleProgmodeOff()
+void KnxWebserver::handleNormalMode()
 {
-    if (setProgmodeFctn != nullptr)
+    if (setKnxModeFctn != nullptr)
     {
-        setProgmodeFctn(false);
+        setKnxModeFctn(KNX_MODE_NORMAL);
+    }
+    server->sendHeader("Location", String("/"), true);
+    server->send(302, "text/plain", "");
+}
+
+void KnxWebserver::handleKnxOff()
+{
+    if (setKnxModeFctn != nullptr)
+    {
+        setKnxModeFctn(KNX_MODE_OFF);
     }
     server->sendHeader("Location", String("/"), true);
     server->send(302, "text/plain", "");
