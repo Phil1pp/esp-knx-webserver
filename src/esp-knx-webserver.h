@@ -12,12 +12,14 @@
     #error "Wrong hardware. Not ESP8266 or ESP32"
 #endif
 
-#define KNX_MODE_OFF 0
-#define KNX_MODE_NORMAL 1
-#define KNX_MODE_PROG 2
+typedef enum __knxModeOptions__ {
+  KNX_MODE_OFF= 0,
+  KNX_MODE_NORMAL= 1,
+  KNX_MODE_PROG= 2,
+} knxModeOptions_t;
 
-typedef void callbackSetKnxMode(int mode);
-typedef int callbackGetKnxMode();
+typedef void callbackSetKnxMode(knxModeOptions_t mode);
+typedef knxModeOptions_t callbackGetKnxMode();
 
 class KnxWebserver
 {
