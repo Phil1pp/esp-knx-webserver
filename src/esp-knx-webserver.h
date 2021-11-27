@@ -13,9 +13,9 @@
 #endif
 
 typedef enum __knxModeOptions__ {
-  KNX_MODE_OFF= 0,
-  KNX_MODE_NORMAL= 1,
-  KNX_MODE_PROG= 2,
+    KNX_MODE_OFF    = 0,
+    KNX_MODE_NORMAL = 1,
+    KNX_MODE_PROG   = 2,
 } knxModeOptions_t;
 
 typedef void callbackSetKnxMode(knxModeOptions_t mode);
