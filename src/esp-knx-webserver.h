@@ -12,7 +12,7 @@
     #error "Wrong hardware. Not ESP8266 or ESP32"
 #endif
 
-typedef enum __knxModeOptions__ {
+typedef enum __knxModeOptions {
     KNX_MODE_OFF    = 0,
     KNX_MODE_NORMAL = 1,
     KNX_MODE_PROG   = 2,
