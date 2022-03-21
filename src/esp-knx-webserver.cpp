@@ -24,7 +24,11 @@ void KnxWebserver::startWeb(const char* www_username, const char* www_password)
     server->on("/otaoff", [this]()
                { if (authRequired && !server->authenticate(username, password)) { return server->requestAuthentication(); } handleOtaOff(); });
     server->on("/restart", [this]()
-               { if (authRequired && !server->authenticate(username, password)) { return server->requestAuthentication(); } ESP.restart(); });
+               { if (authRequired && !server->authenticate(username, password)) { return server->requestAuthentication(); } handleRestart(); });
+    server->on("/tftupdate", [this]()
+               { if (authRequired && !server->authenticate(username, password)) { return server->requestAuthentication(); } handleTftUpdate(); });
+    server->on("/tftdebug", [this]()
+               { if (authRequired && !server->authenticate(username, password)) { return server->requestAuthentication(); } handleTftDebug(); });
     server->onNotFound([this]()
                        { handleNotFound(); });
     server->begin();
@@ -64,6 +68,16 @@ void KnxWebserver::registerSetKnxModeCallback(callbackSetKnxMode *fctn)
 void KnxWebserver::registerGetKnxModeCallback(callbackGetKnxMode *fctn)
 {
     getKnxModeFctn = fctn;
+}
+
+void KnxWebserver::registerTftUpdateCallback(callbackStartTftUpdate *fctn)
+{
+    startTftUpdateFctn = fctn;
+}
+
+void KnxWebserver::registerTftDebugCallback(callbackStartTftDebug *fctn)
+{
+    startTftDebugFctn= fctn;
 }
 
 void KnxWebserver::handleRoot()
@@ -119,6 +133,17 @@ void KnxWebserver::handleRoot()
     }
 
     msg += "<p>System:</p><a class=\"button button-dark\" href=\"/restart\">Restart</a>";
+
+    if (startTftUpdateFctn != nullptr)
+    {
+        msg += "<a class=\"button button-dark\" href=\"/tftupdate\">TFT Update</a>";
+    }
+    
+    if (startTftDebugFctn != nullptr)
+    {
+        msg += "<a class=\"button button-dark\" href=\"/tftdebug\">TFT Debug</a>";
+    }
+
     if (authRequired)
     {
         msg += "<a class=\"button button-dark\" onclick=\"window.open('http://logout@'+window.location.host,'_self');\">Logout</a>";
@@ -206,6 +231,34 @@ void KnxWebserver::handleOtaOff()
     endOta();
     server->sendHeader("Location", String("/"), true);
     server->send(302, "text/plain", "");
+}
+
+void KnxWebserver::handleRestart()
+{
+    server->sendHeader("Location", String("/"), true);
+    server->send(302, "text/plain", "");
+    server->handleClient();
+    ESP.restart();
+}
+
+void KnxWebserver::handleTftUpdate()
+{
+    server->sendHeader("Location", String("/"), true);
+    server->send(302, "text/plain", "");
+    if (startTftUpdateFctn != nullptr)
+    {
+        startTftUpdateFctn();
+    }
+}
+
+void KnxWebserver::handleTftDebug()
+{
+    server->sendHeader("Location", String("/"), true);
+    server->send(302, "text/plain", "");
+    if (startTftDebugFctn != nullptr)
+    {
+        startTftDebugFctn();
+    }
 }
 
 void KnxWebserver::handleNotFound()

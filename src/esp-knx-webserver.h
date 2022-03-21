@@ -20,6 +20,8 @@ typedef enum __knxModeOptions {
 
 typedef void callbackSetKnxMode(knxModeOptions_t mode);
 typedef knxModeOptions_t callbackGetKnxMode();
+typedef void callbackStartTftUpdate();
+typedef void callbackStartTftDebug();
 
 class KnxWebserver
 {
@@ -33,6 +35,8 @@ public:
 
     void registerSetKnxModeCallback(callbackSetKnxMode* fctn);
     void registerGetKnxModeCallback(callbackGetKnxMode* fctn);
+    void registerTftUpdateCallback(callbackStartTftUpdate* fctn);
+    void registerTftDebugCallback(callbackStartTftDebug* fctn);
 
 private:
     #if defined(ESP32)
@@ -56,10 +60,15 @@ private:
     void handleKnxOff();
     void handleOtaOn();
     void handleOtaOff();
+    void handleRestart();
+    void handleTftUpdate();
+    void handleTftDebug();
     void handleNotFound();
     void otaSetup();
     int getRSSIasQuality(int RSSI);
 
     callbackSetKnxMode* setKnxModeFctn;
     callbackGetKnxMode* getKnxModeFctn;
+    callbackStartTftUpdate* startTftUpdateFctn;
+    callbackStartTftDebug* startTftDebugFctn;
 };
