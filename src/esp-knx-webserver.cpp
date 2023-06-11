@@ -42,7 +42,7 @@ void KnxWebserver::loop()
     {
         ArduinoOTA.handle();
         // Disable OTA 5 minutes after startup to reduce WIFI load
-        if (millis() > 5 * 60 * 1000UL + otaStartTime)
+        if (millis() - otaStartTime > 5 * 60 * 1000UL)
         {
             endOta();
         }
