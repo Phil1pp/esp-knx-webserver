@@ -1,8 +1,15 @@
 #include "esp-knx-webserver.h"
+#if defined(ESP32) || defined(LIBRETINY)
+    #include <Update.h>
+#elif defined(ESP8266)
+    #include <Updater.h>
+    #define UPDATE_SIZE_UNKNOWN 0xFFFFFFFF
+    #define errorString() getErrorString().c_str()
+#endif
 
 void KnxWebserver::startWeb(const char *www_username, const char *www_password)
 {
-#if defined(ESP32)
+#if defined(ESP32) || defined(LIBRETINY)
     server = new WebServer(80);
 #elif defined(ESP8266)
     server = new ESP8266WebServer(80);
@@ -29,8 +36,13 @@ void KnxWebserver::startWeb(const char *www_username, const char *www_password)
                { if (authRequired && !server->authenticate(username, password)) { return server->requestAuthentication(); } handleTftUpdate(); });
     server->on("/tftdebug", [this]()
                { if (authRequired && !server->authenticate(username, password)) { return server->requestAuthentication(); } handleTftDebug(); });
+    server->on("/webupdate", [this]()
+               { server->send(200, "text/html", UPDATE_HTML); });
+    server->on("/upload", HTTP_POST, 
+                [this]() { if (authRequired && !server->authenticate(username, password)) { return server->requestAuthentication(); } handleWebUpdateDone(); }, 
+                [this]()  { if (authRequired && !server->authenticate(username, password)) { return server->requestAuthentication(); } handleWebUpdateProgress(); });
     server->on("/favicon.ico", [this]()
-               { server->send_P(200, "image/png", favicon, sizeof(favicon)); });
+               { server->send_P(200, "image/png", FAVICON, sizeof(FAVICON)); });
     server->onNotFound([this]()
                        { handleNotFound(); });
     server->begin();
@@ -40,7 +52,9 @@ void KnxWebserver::loop()
 {
     if (otaActive)
     {
+        #if defined(ESP32) || defined(ESP8266)
         ArduinoOTA.handle();
+        #endif
         // Disable OTA 5 minutes after startup to reduce WIFI load
         if (millis() - otaStartTime > 5 * 60 * 1000UL)
         {
@@ -53,7 +67,9 @@ void KnxWebserver::loop()
 void KnxWebserver::setHostname(String newName)
 {
     hostname = newName;
+	#if defined(ESP32) || defined(ESP8266)
     ArduinoOTA.setHostname(hostname.c_str());
+	#endif
 }
 
 void KnxWebserver::setKnxDetail(String physAddr, bool configOk)
@@ -127,11 +143,11 @@ void KnxWebserver::handleRoot()
     {
         int remainingTime = 5 * 60 - (millis() - otaStartTime) / 1000;
         msg += "<script>var t=" + String(remainingTime) + ";var x=setInterval(function(){var m=Math.floor(t/60);var s=t%60;document.getElementById(\"timer\").innerHTML=m+\"m \"+s+\"s\";t--;if(t<0){clearInterval(x);location.reload();}},1000);</script>";
-        msg += "<p>OTA: <span id=\"timer\"></span></p><a class=\"button button-blue\">ON</a><a class=\"button button-dark\" href=\"/otaoff\">OFF</a>\n";
+        msg += "<p>OTA: <span id=\"timer\"></span></p><a class=\"button button-blue\">ON</a><a class=\"button button-dark\" href=\"/otaoff\">OFF</a><a class=\"button button-dark\" href=\"/webupdate\">Upload</a>\n";
     }
     else
     {
-        msg += "<p>OTA:</p><a class=\"button button-dark\" href=\"/otaon\">ON</a><a class=\"button button-blue\">OFF</a>\n";
+        msg += "<p>OTA:</p><a class=\"button button-dark\" href=\"/otaon\">ON</a><a class=\"button button-blue\">OFF</a><a class=\"button button-dark\" href=\"/webupdate\">Upload</a>\n";
     }
 
     msg += "<p>System:</p><a class=\"button button-dark\" href=\"/restart\">Restart</a>";
@@ -263,11 +279,71 @@ void KnxWebserver::handleTftDebug()
     }
 }
 
+void KnxWebserver::handleWebUpdateProgress() {
+  size_t fsize = UPDATE_SIZE_UNKNOWN;
+  if (server->hasArg("size")) {
+    fsize = server->arg("size").toInt();
+  }
+  HTTPUpload &upload = server->upload();
+  if (upload.status == UPLOAD_FILE_START) {
+    Serial.printf("Receiving Update: %s, Size: %d\n", upload.filename.c_str(), fsize);
+    if (!Update.begin(fsize)) {
+      updateProgress = 0;
+      Update.printError(Serial);
+    }
+  } else if (upload.status == UPLOAD_FILE_WRITE) {
+    if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
+      Update.printError(Serial);
+    } else {
+      updateProgress = 100 * Update.progress() / Update.size();
+    }
+  } else if (upload.status == UPLOAD_FILE_END) {
+    if (Update.end(true)) {
+      Serial.printf("Update Success: %u bytes\nRebooting...\n", upload.totalSize);
+    } else {
+      Serial.printf("%s\n", Update.errorString());
+      updateProgress = 0;
+    }
+  }
+}
+
+void KnxWebserver::handleWebUpdateDone() {
+  server->sendHeader("Connection", "close");
+  if (Update.hasError()) {
+    server->send(502, "text/plain", Update.errorString());
+  } else {
+    server->sendHeader("Refresh", "10");
+    server->sendHeader("Location", "/");
+    server->send(307);
+    ESP.restart();
+  }
+}
+
 void KnxWebserver::handleNotFound()
 {
     server->send(404);
 }
 
+int KnxWebserver::getRSSIasQuality(int RSSI)
+{
+    int quality = 0;
+
+    if (RSSI <= -100)
+    {
+        quality = 0;
+    }
+    else if (RSSI >= -50)
+    {
+        quality = 100;
+    }
+    else
+    {
+        quality = 2 * (RSSI + 100);
+    }
+    return quality;
+}
+
+#if defined(ESP32) || defined(ESP8266)
 void KnxWebserver::otaSetup()
 {
     if (!otaIntialized)
@@ -305,22 +381,17 @@ void KnxWebserver::endOta()
     otaActive = false;
     ArduinoOTA.end();
 }
-
-int KnxWebserver::getRSSIasQuality(int RSSI)
+#else
+//not supported
+void KnxWebserver::otaSetup()
 {
-    int quality = 0;
-
-    if (RSSI <= -100)
-    {
-        quality = 0;
-    }
-    else if (RSSI >= -50)
-    {
-        quality = 100;
-    }
-    else
-    {
-        quality = 2 * (RSSI + 100);
-    }
-    return quality;
 }
+
+void KnxWebserver::startOta()
+{
+}
+
+void KnxWebserver::endOta()
+{
+}
+#endif
