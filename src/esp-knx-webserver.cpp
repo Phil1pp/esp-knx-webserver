@@ -72,6 +72,11 @@ void KnxWebserver::setHostname(String newName)
 	#endif
 }
 
+void KnxWebserver::setBuildDetails(String details)
+{
+    buildDetails = details;
+}
+
 void KnxWebserver::setKnxDetail(String physAddr, bool configOk)
 {
     knxPhysAddr = physAddr;
@@ -139,18 +144,22 @@ void KnxWebserver::handleRoot()
         }
     }
 
+#if defined(ESP32) || defined(ESP8266)
     if (otaActive)
     {
         int remainingTime = 5 * 60 - (millis() - otaStartTime) / 1000;
         msg += "<script>var t=" + String(remainingTime) + ";var x=setInterval(function(){var m=Math.floor(t/60);var s=t%60;document.getElementById(\"timer\").innerHTML=m+\"m \"+s+\"s\";t--;if(t<0){clearInterval(x);location.reload();}},1000);</script>";
-        msg += "<p>OTA: <span id=\"timer\"></span></p><a class=\"button button-blue\">ON</a><a class=\"button button-dark\" href=\"/otaoff\">OFF</a><a class=\"button button-dark\" href=\"/webupdate\">Upload</a>\n";
+        msg += "<p>OTA: <span id=\"timer\"></span></p><a class=\"button button-blue\">ON</a><a class=\"button button-dark\" href=\"/otaoff\">OFF</a>";
     }
     else
     {
-        msg += "<p>OTA:</p><a class=\"button button-dark\" href=\"/otaon\">ON</a><a class=\"button button-blue\">OFF</a><a class=\"button button-dark\" href=\"/webupdate\">Upload</a>\n";
+        msg += "<p>OTA:</p><a class=\"button button-dark\" href=\"/otaon\">ON</a><a class=\"button button-blue\">OFF</a>";
     }
+#else
+    msg += "<p>Webupdate:</p>";
+#endif
 
-    msg += "<p>System:</p><a class=\"button button-dark\" href=\"/restart\">Restart</a>";
+    msg += "<a class=\"button button-dark\" href=\"/webupdate\">Upload</a>\n<p>System:</p><a class=\"button button-dark\" href=\"/restart\">Restart</a>";
 
     if (startTftUpdateFctn != nullptr)
     {
@@ -201,7 +210,23 @@ void KnxWebserver::handleRoot()
     sprintf(strBuffer, "WIFI Signal: %d&percnt;<br>", getRSSIasQuality(WiFi.RSSI()));
     msg += String(strBuffer);
     msg += "Last restart reason: " + ESP.getResetInfo() + "</p>";
+#elif defined(LIBRETINY)
+    char strBuffer[100];
+    msg += "<h3>Beken Chip Info</h3>";
+    sprintf(strBuffer, "<p>Flash size: %.1gMB<br>", ESP.getFlashChipRealSize() / 1024.0 / 1024.0);
+    msg += String(strBuffer);
+    sprintf(strBuffer, "Free heap: %.3gKB<br>", ESP.getFreeHeap() / 1024.0);
+    msg += String(strBuffer);
+    sprintf(strBuffer, "CPU frequency: %dMHz<br>", ESP.getCpuFreqMHz());
+    msg += String(strBuffer);
+    msg += "WIFI MAC: " + String(WiFi.macAddress()) + "<br>";
+    sprintf(strBuffer, "WIFI Signal: %d&percnt;<br>", getRSSIasQuality(WiFi.RSSI()));
+    msg += String(strBuffer);
+    sprintf(strBuffer, "SDK Version: %s<br>", ESP.getSdkVersion());
+    msg += String(strBuffer);
+    msg += "Last restart reason: " + ESP.getResetInfo() + "</p>";
 #endif
+    msg += "<p>" + buildDetails + "</p>\n";
     msg += "</body>\n";
     msg += "</html>\n";
     server->send(200, "text/html", msg);

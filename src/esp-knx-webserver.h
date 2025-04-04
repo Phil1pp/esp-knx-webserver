@@ -36,6 +36,7 @@ public:
     void startOta();
     void endOta();
     void setHostname(String newName);
+    void setBuildDetails(String details);
     void setKnxDetail(String physAddr, bool configOk);
     void loop();
 
@@ -52,6 +53,7 @@ private:
 #endif
     String hostname = "ESP-KNX-Device";
     String knxPhysAddr = "0.0.0";
+    String buildDetails = "";
     bool knxConfigOk = false;
     const char *username;
     const char *password;
@@ -92,6 +94,7 @@ const char* const UPDATE_HTML PROGMEM = R"literal(
     <input type='submit' value='upload'>
     </form>
     <br>
+    <a href="/">back</a>
     <div id='prg' style='width:0;color:white;text-align:center'>0%</div>
 </body>
 <script>
